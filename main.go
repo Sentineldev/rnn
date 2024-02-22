@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 
@@ -91,12 +92,59 @@ func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat
 	for i := 0; i < len(layers); i++ {
 		hidden := hiddens[i]
 		// var next_h_grad *mat.Dense
+		o_weight_grad := mat.NewDense(layers[i].OutputWeights.RawMatrix().Rows, layers[i].OutputWeights.RawMatrix().Cols, nil)
+		o_bias_grad := mat.NewDense(1, 1, nil)
+		h_weight_grad := mat.NewDense(layers[i].HiddenWeights.RawMatrix().Rows, layers[i].HiddenWeights.RawMatrix().Cols, nil)
+		h_bias_grad := mat.NewDense(layers[i].HiddenBias.RawMatrix().Rows, layers[i].HiddenBias.RawMatrix().Cols, nil)
+		var next_h_grad *mat.Dense
 		for j := len(samples) - 1; j > -1; j-- {
 			out_grad := mat.NewDense(1, 1, []float64{grad.At(j, 0)})
-			tranpose_hd := Transpose(mat.NewDense(1, hidden.RowView(j).Len(), hidden.RawRowView(j)))
-			MultiplyMatrix(tranpose_hd, out_grad)
-		}
 
+			// fmt.Println("O_grad")
+			// printMatrix(out_grad)
+			tranpose_hd := Transpose(mat.NewDense(1, hidden.RowView(j).Len(), hidden.RawRowView(j)))
+			//oweight grad
+			o_weight_grad = AddMatrix(o_weight_grad, MultiplyMatrix(tranpose_hd, out_grad))
+
+			o_bias_grad = AddMatrix(o_bias_grad, out_grad)
+			//hiiden grad
+			h_grad := MultiplyMatrix(out_grad, Transpose(layers[i].OutputWeights))
+
+			if j < len(samples)-1 {
+
+				// fmt.Println("Next or previous??")
+				// fmt.Println(next_h_grad.Dims())
+				// fmt.Println("Current")
+				// fmt.Println(Transpose(h_grad).Dims())
+				// fmt.Println("Multiplication")
+				// fmt.Println(MultiplyMatrix(next_h_grad, Transpose(h_grad)).Dims())
+
+				// fmt.Println("h_weight.T")
+				// printMatrix(Transpose(layers[i].HiddenWeights))
+				// fmt.Println("next_h_grad")
+				// printMatrix(next_h_grad)
+				// fmt.Println("H_grad")
+				// printMatrix(h_grad)
+				// fmt.Println("hh_grad")
+				// printMatrix(hh_grad)
+				hh_grad := MultiplyMatrix(next_h_grad, Transpose(layers[i].HiddenWeights))
+				h_grad = AddMatrix(h_grad, hh_grad)
+
+			}
+			next_h_grad = h_grad
+
+			if j > 0 {
+				tranpose_hd := Transpose(mat.NewDense(1, hidden.RowView(j-1).Len(), hidden.RawRowView(j)))
+
+				h_weight_grad = AddMatrix(h_weight_grad, MultiplyMatrix(tranpose_hd, h_grad))
+				h_bias_grad = AddMatrix(h_bias_grad, h_grad)
+			}
+
+			// out_grad := mat.NewDense(1, 1, []float64{samples.At(j, 0)})
+
+			// i_weigth_grad := AddMatrix(i_weigth_grad, )
+
+		}
 	}
 
 }
@@ -121,20 +169,23 @@ func main() {
 	hiddens, outputs := Forward(samples[:10], layers)
 
 	grad := Mse_grad(expectedMatrix, outputs[0])
+
+	print("grad")
+	printMatrix(grad)
 	Backwards(layers, samples[:10], grad, hiddens)
 	// printMatrix(grad)
 
 	// fmt.Printf("expected\n")
 	// printMatrix(expectedMatrix)
 
-	// fmt.Printf("Hiddens\n")
-	// for _, x := range hiddens {
-	// 	printMatrix(x)
-	// }
-	// fmt.Printf("Outputs\n")
-	// for _, x := range outputs {
-	// 	printMatrix(x)
-	// }
+	fmt.Printf("Hiddens\n")
+	for _, x := range hiddens {
+		printMatrix(x)
+	}
+	fmt.Printf("Outputs\n")
+	for _, x := range outputs {
+		printMatrix(x)
+	}
 
 	// rand.Seed(time.Now().Unix())
 
