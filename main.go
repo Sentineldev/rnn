@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LearningRate = 0.000005
+	LearningRate = 0.000001
 )
 
 func GenerateRandomNumber() float64 {
@@ -215,7 +215,10 @@ func main() {
 	samples := LoadSamples()
 	data := SamplesScaled(samples) //140 datas,.
 
-	train_data := data[:int64(float64(len(data))*0.7)]
+	train_slice := int64(float64(len(data)) * 0.5)
+	train_test_slice := int64(float64(len(data)) * 0.4)
+	train_data := data[:train_slice]
+	train_valid := data[len(train_data) : len(data)-int(train_test_slice)]
 	var layer Layer
 	var layers []Layer
 	layer.New(3, 4, 1)
@@ -249,8 +252,30 @@ func main() {
 			epoch_loss += Mse(expectedMatrix, output[0])
 		}
 		if epoch%50 == 0 {
+
+			valid_loss := 0.00
+
+			for j := 0; j < len(train_valid)-seq_length; j++ {
+				seq_x := train_data[j:(j + seq_length)]
+				seq_y := train_data[j:(j + seq_length)]
+				var seq_y_values []float64
+				for _, v := range seq_y {
+					seq_y_values = append(seq_y_values, v.NextDay)
+				}
+				expectedMatrix := mat.NewDense(seq_length, 1, seq_y_values)
+				_, y := Forward(seq_x, layers)
+				valid_loss += Mse(expectedMatrix, y[0])
+
+				fmt.Println("Matriz esperada.")
+				printMatrix(expectedMatrix)
+				fmt.Println("Matriz obtenida.")
+				printMatrix(y[0])
+			}
 			fmt.Printf("Epoch: %f\n", epoch_loss)
-			fmt.Printf("Epoch: %d train loss %f\n", epoch, (epoch_loss / float64(len(train_data))))
+			train_loss := (epoch_loss / float64(len(train_data)))
+			valid_loss_x := valid_loss / float64(len(train_valid))
+			fmt.Printf("Epoch: %d train loss %f valid loss %f\n", epoch, train_loss, valid_loss_x)
+
 		}
 	}
 	fmt.Println("End weights after 100 epochs")
