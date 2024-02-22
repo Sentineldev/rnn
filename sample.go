@@ -33,7 +33,7 @@ func LoadSamples() []Sample {
 		log.Fatal("Error while reading records", err)
 	}
 
-	for _, eachrecord := range records[1:900] {
+	for _, eachrecord := range records {
 
 		date := eachrecord[0]
 		value := eachrecord[1]
@@ -41,11 +41,13 @@ func LoadSamples() []Sample {
 
 		result, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			log.Fatal("Something went wrong.", err)
+			// log.Fatal("Something went wrong.", err)
+			result = 0
 		}
 		result2, err := strconv.ParseFloat(value2, 64)
 		if err != nil {
-			log.Fatal("Something went wrong.", err)
+			// log.Fatal("Something went wrong.", err)
+			result2 = 0
 		}
 		samples = append(samples, Sample{
 			Date:    date,

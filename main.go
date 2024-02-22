@@ -2,14 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 
+	"github.com/montanaflynn/stats"
 	"gonum.org/v1/gonum/mat"
 )
 
 const (
-	LearningRate = 0.25
+	LearningRate = 0.00000001
 )
 
 func GenerateRandomNumber() float64 {
@@ -34,7 +36,24 @@ func GenerateRandomNumber2() float64 {
 
 func Mse_grad(actual *mat.Dense, predicted *mat.Dense) *mat.Dense {
 
-	return SubMatrix(actual, predicted)
+	return SubMatrix(predicted, actual)
+}
+
+func Mse(actual *mat.Dense, predicted *mat.Dense) float64 {
+
+	result := SubMatrix(actual, predicted)
+
+	result.Apply(func(i, j int, v float64) float64 {
+		return v * v
+	}, result)
+
+	transpose := Transpose(result)
+	vec := mat.NewVecDense(transpose.RawMatrix().Cols, transpose.RawRowView(0))
+	x, err := stats.Mean(vec.RawVector().Data)
+	if err != nil {
+		log.Fatal("Error when calculating mean")
+	}
+	return x
 }
 
 func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
@@ -48,7 +67,9 @@ func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
 		output := mat.NewDense(len(samples), layers[i].OutputWeights.RawMatrix().Cols, nil)
 		output.Apply(ApplyZeros, output)
 		for j, sample := range samples {
+
 			x := mat.NewDense(1, layers[i].InputWeights.RawMatrix().Rows, []float64{sample.Value})
+
 			input_x := MultiplyMatrix(x, layers[i].InputWeights)
 
 			previous := hidden.RowView(int(math.Max(float64(j-1), 0)))
@@ -60,7 +81,6 @@ func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
 			}
 			previousMatrix := mat.NewDense(1, previous.Len(), elements)
 			hidden_x := AddMatrix(AddMatrix(input_x, MultiplyMatrix(previousMatrix, layers[i].HiddenWeights)), layers[i].HiddenBias)
-
 			hidden_x.Apply(ApplyTanh, hidden_x)
 
 			var elements2 []float64
@@ -91,8 +111,9 @@ func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
 	return hiddens, []*mat.Dense{outputs[len(outputs)-1]}
 }
 
-func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat.Dense) {
+func Backwards(net []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat.Dense) []Layer {
 
+	layers := net
 	for i := 0; i < len(layers); i++ {
 		hidden := hiddens[i]
 		// var next_h_grad *mat.Dense
@@ -117,21 +138,6 @@ func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat
 
 			if j < len(samples)-1 {
 
-				// fmt.Println("Next or previous??")
-				// fmt.Println(next_h_grad.Dims())
-				// fmt.Println("Current")
-				// fmt.Println(Transpose(h_grad).Dims())
-				// fmt.Println("Multiplication")
-				// fmt.Println(MultiplyMatrix(next_h_grad, Transpose(h_grad)).Dims())
-
-				// fmt.Println("h_weight.T")
-				// printMatrix(Transpose(layers[i].HiddenWeights))
-				// fmt.Println("next_h_grad")
-				// printMatrix(next_h_grad)
-				// fmt.Println("H_grad")
-				// printMatrix(h_grad)
-				// fmt.Println("hh_grad")
-				// printMatrix(hh_grad)
 				hh_grad := MultiplyMatrix(next_h_grad, Transpose(layers[i].HiddenWeights))
 				h_grad = AddMatrix(h_grad, hh_grad)
 
@@ -170,111 +176,85 @@ func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat
 		layers[i].OutputBias = SubMatrix(layers[i].OutputBias, ScaleMatrix(lr, o_bias_grad))
 	}
 
+	return net
 }
-func main() {
+func ScaleData(data []float64) []float64 {
 
+	mean, _ := stats.Mean(data)
+
+	stdDev, _ := stats.StandardDeviation(data)
+
+	scaledData := make([]float64, len(data))
+
+	for i, v := range data {
+		scaledData[i] = (v - mean) / stdDev
+	}
+	return scaledData
+}
+
+func SamplesScaled(samples []Sample) []Sample {
+
+	aux := samples
+	var auxFloats []float64
+
+	for _, v := range samples {
+		auxFloats = append(auxFloats, v.Value)
+	}
+
+	auxFloats = ScaleData(auxFloats)
+
+	for i, v := range auxFloats {
+		aux[i].Value = v
+	}
+
+	return aux
+
+}
+
+func main() {
 	samples := LoadSamples()
+	data := SamplesScaled(samples) //140 datas,.
 
 	var layer Layer
 	var layers []Layer
-
 	layer.New(1, 4, 1)
 	layers = append(layers, layer)
-
-	var expected []float64
-
-	for _, sample := range samples[:10] {
-		expected = append(expected, sample.NextDay)
-	}
+	// var expected []float64
+	// for _, sample := range normalizedSamples {
+	// 	expected = append(expected, sample.NextDay)
+	// }
 
 	fmt.Println("Started weights")
 	printMatrix(layers[0].InputWeights)
 
-	for i := 0; i < 5; i++ {
-		fmt.Printf("Epoch: %d\n", i)
-		expectedMatrix := mat.NewDense(10, 1, expected)
-		hiddens, outputs := Forward(samples[:10], layers)
-		grad := Mse_grad(expectedMatrix, outputs[0])
-		Backwards(layers, samples[:10], grad, hiddens)
-
-		// printMatrix(layers[0].InputWeights)
+	epochs := 1500
+	for epoch := 0; epoch < epochs; epoch++ {
+		seq_length := 7
+		epoch_loss := 0.00
+		for j := 0; j < len(data)-seq_length; j++ {
+			seq_x := data[j:(j + seq_length)]
+			// for _, v := range seq_x {
+			// 	fmt.Printf("%f\n", v.NextDay)
+			// }
+			seq_y := data[j:(j + seq_length)]
+			var seq_y_values []float64
+			for _, v := range seq_y {
+				seq_y_values = append(seq_y_values, v.NextDay)
+			}
+			expectedMatrix := mat.NewDense(seq_length, 1, seq_y_values)
+			hiddens, output := Forward(seq_x, layers)
+			grad := Mse_grad(expectedMatrix, output[0])
+			layers = Backwards(layers, seq_x, grad, hiddens)
+			epoch_loss += Mse(expectedMatrix, output[0])
+		}
+		if epoch%50 == 0 {
+			fmt.Printf("Epoch: %f\n", epoch_loss)
+			fmt.Printf("Epoch: %d train loss %f\n", epoch, (epoch_loss / float64(len(data))))
+		}
 	}
-
-	fmt.Println("End weights after 10 epochs")
+	fmt.Println("End weights after 100 epochs")
 	printMatrix(layers[0].InputWeights)
-
-	// fmt.Printf("expected\n")
-	// printMatrix(expectedMatrix)
-
-	// fmt.Printf("Hiddens\n")
-	// for _, x := range hiddens {
-	// 	printMatrix(x)
-	// }
-	// fmt.Printf("Outputs\n")
-	// for _, x := range outputs {
-	// 	printMatrix(x)
-	// }
-
-	// rand.Seed(time.Now().Unix())
-
-	// i_weigth := mat.NewDense(1, 5, nil)
-	// i_weigth.Apply(ApplyRandomNumbers2, i_weigth)
-
-	// printMatrix(i_weigth)
-
-	// h_weigth := mat.NewDense(5, 5, nil)
-	// h_weigth.Apply(ApplyRandomNumbers2, h_weigth)
-
-	// h_bias := mat.NewDense(1, 5, nil)
-	// h_bias.Apply(ApplyRandomNumbers2, h_bias)
-
-	// o_weight := mat.NewDense(5, 1, nil)
-	// o_weight.Apply(ApplyRandomNumbers, o_weight)
-
-	// o_bias := mat.NewDense(1, 1, nil)
-	// o_bias.Apply(ApplyRandomNumbers, o_bias)
-
-	// outputs := []*mat.Dense{}
-	// hiddens := [3][]*mat.Dense{}
-
-	// var prev_hidden *mat.Dense
-	// for i := 0; i < 3; i++ {
-
-	// 	x := mat.NewDense(1, 1, []float64{samples[i].Value})
-
-	// 	printMatrix(x)
-
-	// 	xi := MultiplyMatrix(x, i_weigth)
-
-	// 	var xh *mat.Dense
-	// 	if i == 0 {
-	// 		xh = AddMatrix(MultiplyMatrix(xi, h_weigth), h_bias)
-	// 	} else {
-	// 		xh = AddMatrix(MultiplyMatrix(AddMatrix(xi, prev_hidden), h_weigth), h_bias)
-	// 		// xh = AddMatrix(AddMatrix(xi, MultiplyMatrix(prev_hidden, h_weigth)), h_bias)
-	// 		// xh = AddMatrix(xi, MultiplyMatrix(prev_hidden, h_weigth))
-	// 		// xh = AddMatrix(xh, h_bias)
-	// 	}
-
-	// 	xh.Apply(func(i, j int, v float64) float64 {
-
-	// 		return math.Tanh(v)
-	// 	}, xh)
-
-	// 	prev_hidden = xh
-
-	// 	printMatrix(xh)
-
-	// 	hiddens[i] = append(hiddens[i], xh)
-
-	// 	xo := AddMatrix(MultiplyMatrix(xh, o_weight), o_bias)
-
-	// 	outputs = append(outputs, xo)
-	// }
-
-	// fmt.Printf("Outputs\n")
-	// for _, x := range outputs {
-	// 	printMatrix(x)
-
-	// }
+	printMatrix(layers[0].InputWeights)
+	printMatrix(layers[0].InputWeights)
+	printMatrix(layers[0].InputWeights)
 }

@@ -25,6 +25,13 @@ func ScaleMatrix(a float64, b *mat.Dense) *mat.Dense {
 	return matrix
 }
 
+func PowMatrix(a *mat.Dense, b int) *mat.Dense {
+
+	a.Pow(a, b)
+	return a
+
+}
+
 func AddMatrix(a *mat.Dense, b *mat.Dense) *mat.Dense {
 
 	matrix := mat.NewDense(a.RawMatrix().Rows, b.RawMatrix().Cols, nil)
