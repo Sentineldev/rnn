@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LearningRate = 0.00000001
+	LearningRate = 0.000005
 )
 
 func GenerateRandomNumber() float64 {
@@ -68,7 +68,7 @@ func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
 		output.Apply(ApplyZeros, output)
 		for j, sample := range samples {
 
-			x := mat.NewDense(1, layers[i].InputWeights.RawMatrix().Rows, []float64{sample.Value})
+			x := mat.NewDense(1, layers[i].InputWeights.RawMatrix().Rows, []float64{sample.Value, sample.Value1, sample.Value2})
 
 			input_x := MultiplyMatrix(x, layers[i].InputWeights)
 
@@ -162,7 +162,7 @@ func Backwards(net []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat.De
 				h_bias_grad = AddMatrix(h_bias_grad, h_grad)
 			}
 
-			result := MultiplyMatrix(mat.NewDense(1, 1, []float64{samples[j].Value}), h_grad)
+			result := MultiplyMatrix(mat.NewDense(3, 1, []float64{samples[j].Value, samples[j].Value1, samples[j].Value2}), h_grad)
 
 			i_weight_grad = AddMatrix(i_weight_grad, result)
 		}
@@ -215,9 +215,10 @@ func main() {
 	samples := LoadSamples()
 	data := SamplesScaled(samples) //140 datas,.
 
+	train_data := data[:int64(float64(len(data))*0.7)]
 	var layer Layer
 	var layers []Layer
-	layer.New(1, 4, 1)
+	layer.New(3, 4, 1)
 	layers = append(layers, layer)
 	// var expected []float64
 	// for _, sample := range normalizedSamples {
@@ -231,12 +232,12 @@ func main() {
 	for epoch := 0; epoch < epochs; epoch++ {
 		seq_length := 7
 		epoch_loss := 0.00
-		for j := 0; j < len(data)-seq_length; j++ {
-			seq_x := data[j:(j + seq_length)]
+		for j := 0; j < len(train_data)-seq_length; j++ {
+			seq_x := train_data[j:(j + seq_length)]
 			// for _, v := range seq_x {
 			// 	fmt.Printf("%f\n", v.NextDay)
 			// }
-			seq_y := data[j:(j + seq_length)]
+			seq_y := train_data[j:(j + seq_length)]
 			var seq_y_values []float64
 			for _, v := range seq_y {
 				seq_y_values = append(seq_y_values, v.NextDay)
@@ -249,12 +250,13 @@ func main() {
 		}
 		if epoch%50 == 0 {
 			fmt.Printf("Epoch: %f\n", epoch_loss)
-			fmt.Printf("Epoch: %d train loss %f\n", epoch, (epoch_loss / float64(len(data))))
+			fmt.Printf("Epoch: %d train loss %f\n", epoch, (epoch_loss / float64(len(train_data))))
 		}
 	}
 	fmt.Println("End weights after 100 epochs")
 	printMatrix(layers[0].InputWeights)
-	printMatrix(layers[0].InputWeights)
-	printMatrix(layers[0].InputWeights)
-	printMatrix(layers[0].InputWeights)
+	printMatrix(layers[0].HiddenWeights)
+	printMatrix(layers[0].HiddenBias)
+	printMatrix(layers[0].OutputWeights)
+	printMatrix(layers[0].OutputBias)
 }
