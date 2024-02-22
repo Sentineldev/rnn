@@ -8,8 +8,9 @@ import (
 )
 
 type Sample struct {
-	Date  string
-	Value float64
+	Date    string
+	Value   float64
+	NextDay float64
 }
 
 func LoadSamples() []Sample {
@@ -36,15 +37,20 @@ func LoadSamples() []Sample {
 
 		date := eachrecord[0]
 		value := eachrecord[1]
+		value2 := eachrecord[4]
 
 		result, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			log.Fatal("Something went wrong.", err)
 		}
-
+		result2, err := strconv.ParseFloat(value2, 64)
+		if err != nil {
+			log.Fatal("Something went wrong.", err)
+		}
 		samples = append(samples, Sample{
-			Date:  date,
-			Value: result,
+			Date:    date,
+			Value:   result,
+			NextDay: result2,
 		})
 	}
 

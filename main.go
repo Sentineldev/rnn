@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 
@@ -26,6 +25,11 @@ func GenerateRandomNumber2() float64 {
 
 	// Multiplicar el número por 2 y restar 1 para obtener un rango entre -1 y 1
 	return result/5 - .1
+}
+
+func Mse_grad(actual *mat.Dense, predicted *mat.Dense) *mat.Dense {
+
+	return SubMatrix(actual, predicted)
 }
 
 func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
@@ -82,6 +86,20 @@ func Forward(samples []Sample, layers []Layer) ([]*mat.Dense, []*mat.Dense) {
 	return hiddens, []*mat.Dense{outputs[len(outputs)-1]}
 }
 
+func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat.Dense) {
+
+	for i := 0; i < len(layers); i++ {
+		hidden := hiddens[i]
+		// var next_h_grad *mat.Dense
+		for j := len(samples) - 1; j > -1; j-- {
+			out_grad := mat.NewDense(1, 1, []float64{grad.At(j, 0)})
+			tranpose_hd := Transpose(mat.NewDense(1, hidden.RowView(j).Len(), hidden.RawRowView(j)))
+			MultiplyMatrix(tranpose_hd, out_grad)
+		}
+
+	}
+
+}
 func main() {
 
 	samples := LoadSamples()
@@ -91,16 +109,32 @@ func main() {
 
 	layer.New(1, 4, 1)
 	layers = append(layers, layer)
+
+	var expected []float64
+
+	for _, sample := range samples[:10] {
+		expected = append(expected, sample.NextDay)
+	}
+
+	expectedMatrix := mat.NewDense(10, 1, expected)
+
 	hiddens, outputs := Forward(samples[:10], layers)
 
-	fmt.Printf("Hiddens\n")
-	for _, x := range hiddens {
-		printMatrix(x)
-	}
-	fmt.Printf("Outputs\n")
-	for _, x := range outputs {
-		printMatrix(x)
-	}
+	grad := Mse_grad(expectedMatrix, outputs[0])
+	Backwards(layers, samples[:10], grad, hiddens)
+	// printMatrix(grad)
+
+	// fmt.Printf("expected\n")
+	// printMatrix(expectedMatrix)
+
+	// fmt.Printf("Hiddens\n")
+	// for _, x := range hiddens {
+	// 	printMatrix(x)
+	// }
+	// fmt.Printf("Outputs\n")
+	// for _, x := range outputs {
+	// 	printMatrix(x)
+	// }
 
 	// rand.Seed(time.Now().Unix())
 

@@ -25,7 +25,26 @@ func AddMatrix(a *mat.Dense, b *mat.Dense) *mat.Dense {
 	return matrix
 }
 
-func printMatrix(a *mat.Dense) {
+func SubMatrix(a *mat.Dense, b *mat.Dense) *mat.Dense {
+
+	matrix := mat.NewDense(a.RawMatrix().Rows, b.RawMatrix().Cols, nil)
+
+	matrix.Sub(a, b)
+
+	return matrix
+}
+
+func Transpose(a *mat.Dense) *mat.Dense {
+
+	transpose := a.T()
+	tranposeMatrix := mat.NewDense(1, 1, nil)
+
+	tranposeMatrix.CloneFrom(transpose)
+
+	return tranposeMatrix
+}
+
+func printMatrix(a mat.Matrix) {
 
 	fmt.Println(mat.Formatted(a, mat.Prefix("")))
 	fmt.Println()
