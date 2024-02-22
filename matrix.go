@@ -16,6 +16,15 @@ func MultiplyMatrix(a *mat.Dense, b *mat.Dense) *mat.Dense {
 	return matrix
 }
 
+func ScaleMatrix(a float64, b *mat.Dense) *mat.Dense {
+
+	matrix := mat.NewDense(b.RawMatrix().Rows, b.RawMatrix().Cols, nil)
+
+	matrix.Scale(a, b)
+
+	return matrix
+}
+
 func AddMatrix(a *mat.Dense, b *mat.Dense) *mat.Dense {
 
 	matrix := mat.NewDense(a.RawMatrix().Rows, b.RawMatrix().Cols, nil)
@@ -63,6 +72,19 @@ func ApplyTanh(i, j int, v float64) float64 {
 	return math.Tanh(v)
 }
 
+func ApplyDerivTanh(i, j int, v float64) float64 {
+	return 1 - math.Pow(math.Tanh(v), 2)
+}
+
 func ApplyZeros(i, j int, v float64) float64 {
 	return 0
+}
+
+func MultVec(a *mat.VecDense, b *mat.VecDense) *mat.VecDense {
+
+	vec := mat.NewVecDense(a.Len(), nil)
+
+	vec.MulElemVec(a, b)
+
+	return vec
 }

@@ -8,6 +8,10 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+const (
+	LearningRate = 0.25
+)
+
 func GenerateRandomNumber() float64 {
 	// Crear un nuevo generador de números aleatorios
 
@@ -96,6 +100,7 @@ func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat
 		o_bias_grad := mat.NewDense(1, 1, nil)
 		h_weight_grad := mat.NewDense(layers[i].HiddenWeights.RawMatrix().Rows, layers[i].HiddenWeights.RawMatrix().Cols, nil)
 		h_bias_grad := mat.NewDense(layers[i].HiddenBias.RawMatrix().Rows, layers[i].HiddenBias.RawMatrix().Cols, nil)
+		i_weight_grad := mat.NewDense(layers[i].InputWeights.RawMatrix().Rows, layers[i].InputWeights.RawMatrix().Cols, nil)
 		var next_h_grad *mat.Dense
 		for j := len(samples) - 1; j > -1; j-- {
 			out_grad := mat.NewDense(1, 1, []float64{grad.At(j, 0)})
@@ -131,20 +136,38 @@ func Backwards(layers []Layer, samples []Sample, grad *mat.Dense, hiddens []*mat
 				h_grad = AddMatrix(h_grad, hh_grad)
 
 			}
+
+			tanh_deriv := mat.NewDense(1, hidden.RowView(j).Len(), hidden.RawRowView(j))
+
+			tanh_deriv.Apply(ApplyDerivTanh, tanh_deriv)
+
+			temp1 := mat.NewVecDense(tanh_deriv.RowView(0).Len(), tanh_deriv.RawRowView(0))
+			temp2 := mat.NewVecDense(h_grad.RowView(0).Len(), h_grad.RawRowView(0))
+
+			aux_vec := MultVec(temp1, temp2)
+			h_grad = mat.NewDense(1, aux_vec.Len(), aux_vec.RawVector().Data)
+
 			next_h_grad = h_grad
 
-			if j > 0 {
+			if j > 1 {
 				tranpose_hd := Transpose(mat.NewDense(1, hidden.RowView(j-1).Len(), hidden.RawRowView(j)))
 
 				h_weight_grad = AddMatrix(h_weight_grad, MultiplyMatrix(tranpose_hd, h_grad))
 				h_bias_grad = AddMatrix(h_bias_grad, h_grad)
 			}
 
-			// out_grad := mat.NewDense(1, 1, []float64{samples.At(j, 0)})
+			result := MultiplyMatrix(mat.NewDense(1, 1, []float64{samples[j].Value}), h_grad)
 
-			// i_weigth_grad := AddMatrix(i_weigth_grad, )
-
+			i_weight_grad = AddMatrix(i_weight_grad, result)
 		}
+
+		lr := LearningRate / float64(len(samples))
+
+		layers[i].InputWeights = SubMatrix(layers[i].InputWeights, ScaleMatrix(lr, i_weight_grad))
+		layers[i].HiddenWeights = SubMatrix(layers[i].HiddenWeights, ScaleMatrix(lr, h_weight_grad))
+		layers[i].HiddenBias = SubMatrix(layers[i].HiddenBias, ScaleMatrix(lr, h_bias_grad))
+		layers[i].OutputWeights = SubMatrix(layers[i].OutputWeights, ScaleMatrix(lr, o_weight_grad))
+		layers[i].OutputBias = SubMatrix(layers[i].OutputBias, ScaleMatrix(lr, o_bias_grad))
 	}
 
 }
@@ -164,28 +187,33 @@ func main() {
 		expected = append(expected, sample.NextDay)
 	}
 
-	expectedMatrix := mat.NewDense(10, 1, expected)
+	fmt.Println("Started weights")
+	printMatrix(layers[0].InputWeights)
 
-	hiddens, outputs := Forward(samples[:10], layers)
+	for i := 0; i < 5; i++ {
+		fmt.Printf("Epoch: %d\n", i)
+		expectedMatrix := mat.NewDense(10, 1, expected)
+		hiddens, outputs := Forward(samples[:10], layers)
+		grad := Mse_grad(expectedMatrix, outputs[0])
+		Backwards(layers, samples[:10], grad, hiddens)
 
-	grad := Mse_grad(expectedMatrix, outputs[0])
+		// printMatrix(layers[0].InputWeights)
+	}
 
-	print("grad")
-	printMatrix(grad)
-	Backwards(layers, samples[:10], grad, hiddens)
-	// printMatrix(grad)
+	fmt.Println("End weights after 10 epochs")
+	printMatrix(layers[0].InputWeights)
 
 	// fmt.Printf("expected\n")
 	// printMatrix(expectedMatrix)
 
-	fmt.Printf("Hiddens\n")
-	for _, x := range hiddens {
-		printMatrix(x)
-	}
-	fmt.Printf("Outputs\n")
-	for _, x := range outputs {
-		printMatrix(x)
-	}
+	// fmt.Printf("Hiddens\n")
+	// for _, x := range hiddens {
+	// 	printMatrix(x)
+	// }
+	// fmt.Printf("Outputs\n")
+	// for _, x := range outputs {
+	// 	printMatrix(x)
+	// }
 
 	// rand.Seed(time.Now().Unix())
 
