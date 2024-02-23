@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"rnn/templates"
+	"time"
 
-	"github.com/a-h/templ"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -18,11 +19,116 @@ const (
 // 	Train(150, 12)
 // }
 
+type PostTraining struct {
+	Epochs  int64
+	Hiddens int64
+}
+
+type PostPredictRnn struct {
+	Input_Weights  [][]float64
+	Hidden_Weights [][]float64
+	Hidden_Bias    [][]float64
+	Output_Weights [][]float64
+	Output_Bias    [][]float64
+	Hidden_Units   int64
+}
+
+type PostPredictData struct {
+	Date       string
+	T_Max      float64
+	T_Min      float64
+	Rain       float64
+	T_Tomorrow float64
+}
+type PostPredictBody struct {
+	Rnn  PostPredictRnn
+	Data []PostPredictData
+}
+
+func HandlePing(ctx *gin.Context) {
+
+	ctx.JSON(200, gin.H{
+		"message": "Pong",
+	})
+}
+
+func HandleTrainingPost(ctx *gin.Context) {
+
+	var data PostTraining
+	if err := ctx.BindJSON(&data); err != nil {
+		ctx.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	layers, logs := Train2(int(data.Epochs), data.Hiddens)
+	input_weights, hidden_weights, hidden_bias, output_weights, output_bias := layers[0].GetArrays()
+	ctx.IndentedJSON(http.StatusOK, gin.H{
+		"logs": logs,
+		"weights": gin.H{
+			"input_weights":  input_weights,
+			"hidden_weights": hidden_weights,
+			"hidden_bias":    hidden_bias,
+			"output_weights": output_weights,
+			"output_bias":    output_bias,
+		},
+	})
+}
+
+func GeneratePrediction(ctx *gin.Context) {
+	var body PostPredictBody
+
+	if err := ctx.BindJSON(&body); err != nil {
+		ctx.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	var samples []Sample
+
+	for _, v := range body.Data {
+		samples = append(samples, Sample{
+			Date:    v.Date,
+			Value:   v.T_Max,
+			Value1:  v.T_Min,
+			Value2:  v.Rain,
+			NextDay: v.T_Tomorrow,
+		})
+	}
+
+	var layer Layer
+	var layers []Layer
+	layer.New(3, body.Rnn.Hidden_Units, 1)
+	layer.FromArrayMatrixes(body.Rnn)
+	layers = append(layers, layer)
+
+	_, outputs := Forward(samples, layers)
+	transpose := Transpose(outputs[0])
+
+	transpose.RawRowView(0)
+	fmt.Println(outputs[0].Dims())
+	ctx.IndentedJSON(http.StatusOK, gin.H{
+		"outputs": transpose.RawRowView(0),
+	})
+}
+
 func main() {
 
-	http.Handle("/", templ.Handler(templates.Hello()))
-	fmt.Println("Running...")
-	http.ListenAndServe(":3000", nil)
+	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		AllowOriginFunc: func(origin string) bool {
+			return origin == "*"
+		},
+		MaxAge: 12 * time.Hour,
+	}))
+
+	r.GET("/ping", HandlePing)
+	r.POST("/train", HandleTrainingPost)
+	r.POST("/predict", GeneratePrediction)
+	r.Run("127.0.0.1:3000")
+
 }
 
 // func GenerateRandomNumber() float64 {
@@ -306,7 +412,7 @@ func main() {
 // 	// 			}
 // 	// 			expectedMatrix := mat.NewDense(seq_length, 1, seq_y_values)
 // 	// 			_, y := Forward(seq_x, layers)
-// 	// 			valid_loss += Mse(expectedMatrix, y[HandlerFListenAndServe(addr, handler)
+// 	// 			valid_loss += Mse(expectedMatrix, y[HandlerFListenAndServe(addr, handlgin
 
 // 	// 			// fmt.Println("Matriz esperada.")
 // 	// 			// printMatrix(expectedMatrix)

@@ -60,7 +60,7 @@ func Transpose(a *mat.Dense) *mat.Dense {
 	return tranposeMatrix
 }
 
-func printMatrix(a mat.Matrix) {
+func PrintMatrix(a mat.Matrix) {
 
 	fmt.Println(mat.Formatted(a, mat.Prefix("")))
 	fmt.Println()

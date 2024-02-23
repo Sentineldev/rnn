@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -231,8 +232,26 @@ func GetArrayPage(array []Sample, currentPage int64, elementsPerPage int64) []Sa
 	return elements
 }
 
-func Train(epochs int, hiddenNeurons int64) []Layer {
+func Train2(epochs int, hiddenNeurons int64) ([]Layer, []string) {
 
+	var layersAux []Layer
+	var logsAux []string
+	for {
+		layers, logs, err := Train(epochs, hiddenNeurons)
+
+		if err == nil {
+			layersAux = layers
+			logsAux = logs
+			break
+		}
+	}
+
+	return layersAux, logsAux
+}
+
+func Train(epochs int, hiddenNeurons int64) ([]Layer, []string, error) {
+
+	var logs []string
 	samples := LoadSamples()
 	data := SamplesScaled(samples) //140 datas,.
 
@@ -291,15 +310,15 @@ func Train(epochs int, hiddenNeurons int64) []Layer {
 				// printMatrix(y[0])
 			}
 			if math.IsNaN(epoch_loss) {
-				Train(epochs, hiddenNeurons)
-				return layers
+				return layers, logs, errors.New("fallo de gradiente")
 			}
 			fmt.Printf("Epoch: %f\n", epoch_loss)
 			train_loss := (epoch_loss / float64(len(train_data)))
 			valid_loss_x := valid_loss / float64(len(train_valid))
+			logs = append(logs, fmt.Sprintf("Epoch: %d train loss %f valid loss %f\n", epoch, train_loss, valid_loss_x))
 			fmt.Printf("Epoch: %d train loss %f valid loss %f\n", epoch, train_loss, valid_loss_x)
 		}
 
 	}
-	return layers
+	return layers, logs, nil
 }
