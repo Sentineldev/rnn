@@ -73,6 +73,11 @@ func ApplyRandomNumbers(i, j int, v float64) float64 {
 func ApplyRandomNumbers2(i, j int, v float64) float64 {
 
 	return GenerateRandomNumber2()
+	// return XavierInitialization2(NodesOut)
+	// return XavierInitialization(NodesIn, NodesOut)
+	// x := rand.Float64()
+	// x -= 0.1
+	// return x
 }
 
 func ApplyTanh(i, j int, v float64) float64 {

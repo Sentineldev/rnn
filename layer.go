@@ -1,9 +1,6 @@
 package main
 
 import (
-	"math/rand"
-	"time"
-
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -18,7 +15,6 @@ type Layer struct {
 
 func (layer *Layer) New(nodesInt int64, nodesOut int64, outputs int64) {
 
-	rand.Seed(time.Now().UnixNano())
 	// k := 1 / math.Sqrt(float64(nodesOut))
 
 	layer.InputWeights = mat.NewDense(int(nodesInt), int(nodesOut), nil)
